@@ -6,6 +6,7 @@ import math
 def main():
     pawns_list = []
     current_tick = 0
+    factionID = "Faction_"
 
     tree = ET.parse('save.xml')
     root = tree.getroot()
@@ -22,7 +23,11 @@ def main():
             if kind.text == "Colonist":
                 pawns_list.append(buildPawn(root,thing))
 
-    # Dead colonists
+    # Finding PlayerColony faction
+    for faction in root.findall(".game/world/factionManager/allFactions/li"):
+        if faction.find("def").text == "PlayerColony":
+            print("Found player faction name:",faction.find("name").text, "\tFaction ID:",faction.find("loadID").text)
+            factionID += str(faction.find("loadID").text)
 
     # Colonists inside buildings (for example crib, biosculpting pod, etc.)
     for thing in root.findall(".//li[@Class='Pawn']"):
@@ -30,12 +35,19 @@ def main():
             if kind.text == "Colonist":
                 pawns_list.append(buildPawn(root,thing))
 
+    # Mothballed colonists (i.e. kidnapped!)
+    for thing in root.findall("./game/world/worldPawns/pawnsMothballed/li"):
+        for kind in thing.findall("./kindDef"):
+            if kind.text == "Colonist" and factionID == thing.find("faction").text:
+                pawns_list.append(buildPawn(root,thing))
+
     # Print colonists table
-    print("Known colonists:")
+    print("\nKnown colonists:")
     for colonist in pawns_list:
-        print(colonist.first_name,colonist.last_name,colonist.age,colonist.gender)
+        print(colonist.id,"\t",colonist.first_name,colonist.last_name,"\t",colonist.age,colonist.gender,"Known parents:",len(colonist.parents))
 
     # Creating the graph
+    print("\nBuilding graph:")
     f = Digraph(format='jpg', encoding='utf8', filename='family_tree')
     f.attr('node', shape='box')
     f.attr('graph',rankdir='BT')
@@ -65,6 +77,7 @@ def buildPawn(root,thing):
     except Exception as error:
         print("[buildPawn] WARNING:",error," when trying to get pawns nickname. Pawn:",new_pawn.id, new_pawn.first_name, new_pawn.last_name)
     new_pawn.last_name = thing.find('name/last').text
+    
     new_pawn.age = math.floor(float(thing.find('ageTracker/ageBiologicalTicks').text)/3600000)
     if thing.find('gender'):
         new_pawn.gender = thing.find('gender').text
